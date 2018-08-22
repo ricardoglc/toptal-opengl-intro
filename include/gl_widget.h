@@ -9,6 +9,7 @@
 #include "model3d.h"
 
 #include <QOpenGLWidget>
+#include <QOpenGLFunctions>
 #include <QOpenGLShaderProgram>
 #include <QVector3D>
 #include <QMatrix4x4>
@@ -65,6 +66,7 @@ private:
     int                     m_coordNormal;
     int                     m_matrixVertex;
     int                     m_matrixNormal;
+    int                     m_animTime;
     int                     m_colorFragment;
 
 private:
@@ -72,6 +74,7 @@ private:
     QMatrix4x4  m_matrixRotate;
     bool        m_mouseMove;
     QPoint      m_mousePos;
+    float       m_animTimeValue = 0;
 };
 
 #endif // GL_WIDGET_H

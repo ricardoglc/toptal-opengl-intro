@@ -9,7 +9,7 @@
 # Visit www.toptal.com/blog and subscribe to our newsletter to read great posts
 #-------------------------------------------------
 
-QT       += core gui
+QT       += core gui opengl
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -39,3 +39,8 @@ FORMS    += \
     ui/createcharmodeldlg.ui
 
 RESOURCES +=
+
+win32 {
+    LIBS += opengl32.lib
+}
+

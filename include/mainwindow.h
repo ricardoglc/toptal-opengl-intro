@@ -7,6 +7,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QOpenGLContext>
 
 namespace Ui {
 class MainWindow;

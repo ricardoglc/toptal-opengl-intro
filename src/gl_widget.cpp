@@ -12,6 +12,7 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QtMath>
+#include <QTimer>
 
 const double GlWidget::m_wheelStep = 1.05;
 const double GlWidget::m_scaleMin = 0.001;
@@ -29,6 +30,9 @@ GlWidget::GlWidget(QWidget* parent)
     ,   m_scaleCoeff(1.0)
     ,   m_mouseMove(false)
 {
+    QTimer *timer = new QTimer(this);
+    connect(timer, SIGNAL(timeout()), this, SLOT(update()));
+    timer->start(10);
 }
 
 GlWidget::~GlWidget()
@@ -38,6 +42,8 @@ GlWidget::~GlWidget()
 
 void GlWidget::SetModel(Model3D& model)
 {
+    makeCurrent();
+
     FreeRenderData();
     if(!model.IsValid())
     {
@@ -81,37 +87,43 @@ void GlWidget::SetModel(Model3D& model)
 
 void GlWidget::initializeGL()
 {
-    QOpenGLWidget::initializeGL();
-
     m_shaderProgram.addShaderFromSourceCode(QOpenGLShader::Vertex,
-        QString::fromUtf8(
-            "#version 400\r\n"
-            "\r\n"
-            "layout (location = 0) in vec3 coordVertexes;\r\n"
-            "layout (location = 1) in vec3 coordNormals;\r\n"
-            "flat out float lightIntensity;\r\n"
-            "\r\n"
-            "uniform mat4 matrixVertex;\r\n"
-            "uniform mat4 matrixNormal;\r\n"
-            "\r\n"
-            "void main()\r\n"
-            "{\r\n"
-            "   gl_Position = matrixVertex * vec4(coordVertexes, 1.0);\r\n"
-            "   lightIntensity = abs((matrixNormal * vec4(coordNormals, 1.0)).z);\r\n"
-            "}"));
+        QString::fromUtf8(R"(
+
+            #version 400
+
+            layout (location = 0) in vec3 coordVertexes;
+            layout (location = 1) in vec3 coordNormals;
+            flat out float lightIntensity;
+
+            uniform mat4 matrixVertex;
+            uniform mat4 matrixNormal;
+            uniform float animTime;
+
+            void main()
+            {
+               float displacement = 0.1 * sin(animTime + 2 * coordVertexes.x);
+               gl_Position = matrixVertex * vec4(coordVertexes.x, coordVertexes.y + displacement, coordVertexes.z, 1.0);
+               lightIntensity = abs((matrixNormal * vec4(coordNormals, 1.0)).z);
+            }
+
+            )"));
     m_shaderProgram.addShaderFromSourceCode(QOpenGLShader::Fragment,
-        QString::fromUtf8(
-            "#version 400\r\n"
-            "\r\n"
-            "flat in float lightIntensity;\r\n"
-            "\r\n"
-            "layout (location = 0) out vec4 FragColor;\r\n"
-            "uniform vec3 fragmentColor;\r\n"
-            "\r\n"
-            "void main()\r\n"
-            "{\r\n"
-            "    FragColor = vec4(fragmentColor * lightIntensity, 1.0);\r\n"
-            "}"));
+        QString::fromUtf8(R"(
+
+            #version 400
+
+            flat in float lightIntensity;
+
+            layout (location = 0) out vec4 FragColor;
+            uniform vec3 fragmentColor;
+
+            void main()
+            {
+                FragColor = vec4(fragmentColor * lightIntensity, 1.0);
+            }
+
+            )"));
     m_shaderProgram.link();
     m_shaderProgram.bind();
 
@@ -119,6 +131,7 @@ void GlWidget::initializeGL()
     m_coordNormal = m_shaderProgram.attributeLocation(QString::fromUtf8("coordNormals"));
     m_matrixVertex = m_shaderProgram.uniformLocation(QString::fromUtf8("matrixVertex"));
     m_matrixNormal = m_shaderProgram.uniformLocation(QString::fromUtf8("matrixNormal"));
+    m_animTime = m_shaderProgram.uniformLocation(QString::fromUtf8("animTime"));
     m_colorFragment = m_shaderProgram.uniformLocation(QString::fromUtf8("fragmentColor"));
 
     glEnable(GL_DEPTH_TEST);
@@ -147,9 +160,13 @@ void GlWidget::paintGL()
     QMatrix4x4 matrixVertex;
     GetMatrixTransform(matrixVertex, m_model);
 
+    // Update animation
+    m_animTimeValue += 0.05;
+
     // Set Shader Program object' parameters
     m_shaderProgram.setUniformValue(m_matrixVertex, matrixVertex);
     m_shaderProgram.setUniformValue(m_matrixNormal, m_matrixRotate);
+    m_shaderProgram.setUniformValue(m_animTime, m_animTimeValue);
     QColor fragmentColor(eFragmentColor);
     m_shaderProgram.setUniformValue(m_colorFragment,
         static_cast<GLfloat>(fragmentColor.red()) / 256.0f,
@@ -188,6 +205,8 @@ void GlWidget::resizeGL(int w, int h)
 
 void GlWidget::FreeRenderData()
 {
+    makeCurrent();
+
     QOpenGLFunctions funcs(QOpenGLContext::currentContext());
     if(0 != m_hVertexes)
     {
